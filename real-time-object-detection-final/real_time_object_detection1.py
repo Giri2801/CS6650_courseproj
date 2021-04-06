@@ -9,6 +9,9 @@ import argparse
 import imutils
 import time
 import cv2
+from pynput.mouse import Button, Controller
+
+mouse = Controller()
 
 # construct the argument parse and parse the arguments
 # ap = argparse.ArgumentParser()
@@ -41,6 +44,7 @@ while True:
 	# to have a maximum width of 400 pixels
     frame = vs.read()
     frame = imutils.resize(frame, width=400)
+    height, width = frame.shape[:2]
 
 	# grab the frame dimensions and convert it to a blob
 	# (h, w) = frame.shape[:2]
@@ -92,6 +96,9 @@ while True:
             bottom = detection[6] * rows
             label = "{}: {:.2f}%".format("phone",score* 100)
             cv2.rectangle(img, (int(left), int(top)), (int(right), int(bottom)), (23, 230, 210), thickness=2)
+            mouse_x = int(1920*(left+right)*0.5/width)
+            mouse_y = int(1080*(top+bottom)*0.5/height)
+            mouse.position = (mouse_x, mouse_y)
             y = int(top) - 15
             if top < 30 :
                  y = int(top) + 15
