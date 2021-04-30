@@ -16,22 +16,33 @@ def server(port_num) :
     UDPServerSocket.bind((localIP, localPort))
     print("UDP server up and listening")
     # Listen for incoming datagrams
-    count = 100
+    count = 1000
     prev_time = time.time()
+    acc_x=[]
+    acc_y = []
     while count:
         count-=1
         bytesAddressPair = UDPServerSocket.recvfrom(bufferSize)
         curr_time = time.time()
         delta = curr_time-prev_time
-        print(delta)
+        prev_time = curr_time
+        # print(delta)
         clientMsg = bytesAddressPair[0]
-        print(clientMsg)
+        # print(clientMsg)
         s=json.loads(clientMsg)
+        # print(str(s))
         if s['purpose'] == 'update' :
-            accx = s['linAccel'][0]
-            accy = s['linAccel'][1]
+            accx = s['ax']
+            accy = s['ay']
+            acc_x.append(accx)
+            acc_y.append(accy)
         elif s['purpose'] == '' :
             click = True
+            
+    plt.plot(np.linspace(0,len(acc_x),len(acc_x)),acc_x)
+    plt.plot(np.linspace(0,len(acc_x),len(acc_x)),acc_y)
+    plt.legend()
+    plt.show()
 
   
 if __name__ == "__main__":
