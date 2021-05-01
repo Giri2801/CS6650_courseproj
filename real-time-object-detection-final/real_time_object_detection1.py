@@ -16,6 +16,7 @@ from filterpy.kalman import KalmanFilter
 import matplotlib.pyplot as plt
 import json
 
+
 mouse_x = 0
 mouse_y = 0
 
@@ -23,9 +24,10 @@ acc_x = 0
 acc_y = 0
 
 del_t = 0
-
-
+start_time=0
+init_mouse = 0
 def fun1(port_num) :
+	global mouse
 	localIP     = "192.168.1.4"
 	localPort   = port_num
 	bufferSize  = 1024
@@ -35,13 +37,15 @@ def fun1(port_num) :
 	UDPServerSocket.bind((localIP, localPort))
 	print("UDP server up and listening")
 	# Listen for incoming datagrams
-	count = 100
-	prev_time = time.time()
-	while count:
-		count-=1
+	prev_time = -1
+	
+	while True:
 		bytesAddressPair = UDPServerSocket.recvfrom(bufferSize)
 		curr_time = time.time()
-		del_t = curr_time-prev_time
+		if prev_time==-1 :
+			prev_time=curr_time
+
+		del_t = curr_time - prev_time
 		prev_time = curr_time
 		clientMsg = bytesAddressPair[0]
 		s=json.loads(clientMsg)
@@ -49,10 +53,25 @@ def fun1(port_num) :
 			acc_x = s['ax']
 			acc_y = s['ay']
 			# print("UDP",acc_x,acc_y)
-		elif s['purpose'] == '' :
+		elif s['purpose'] == 'click' :
+			if s['click']==-1 :
+				mouse.click(Button.left,1)
+			elif s['click']==-2 :
+				mouse.click(Button.left,2)
+			elif s['click']==2 :
+				mouse.click(Button.right,2)
+			else :
+				mouse.click(Button.right,1)
 			click = True
+		elif s['purpose'] == 'scroll' :
+			j = s['scroll']
+			mouse.scroll(0,int(j/50.0))
 		else :
 			print("Screen_size",s['length'],s['breadth'])
+
+		if del_t == 0 :
+			kalman_init()
+		kalman(del_t)
   
   
 def fun2() :
@@ -110,6 +129,10 @@ def fun2() :
 				right = detection[5] * cols
 				bottom = detection[6] * rows
 				label = "{}: {:.2f}%".format("phone",score* 100)
+				global mouse_x
+				global mouse_y
+				global acc_x
+				global acc_y
 				cv2.rectangle(img, (int(left), int(top)), (int(right), int(bottom)), (23, 230, 210), thickness=2)
 				mouse_x = int(2500*(left+right)*0.5/width)
 				mouse_y = int(1406*(top+bottom)*0.5/height)
@@ -126,6 +149,9 @@ def fun2() :
 				x += mouse_x
 				y += mouse_y
 				count +=1
+				global init_mouse
+				init_mouse = 1
+				# print("init mouse 1")
 				if count==5 :
 					count=0
 					print("Camera",x/5,y/5)
@@ -144,53 +170,67 @@ def fun2() :
 	cv2.destroyAllWindows()
 	vs.stop()
  
+c_x = 0.01515088909
+c_y = 0.02248852815
+
+def kalman_init() :
+	while not init_mouse :
+		i=1
+	x_position = mouse_x*c_x/100
+	y_position = mouse_y*c_y/100
+	global kf_x
+	kf_x = KalmanFilter(dim_x=2, dim_z=1, dim_u=1)
+	kf_x.x = np.array([x_position, 0.])
+
+	kf_x.P = [[1,0],[0,1]]
+	kf_x.Q = [[0.1,0],[0,0.1]]
+	kf_x.R = [[1]]
+	kf_x.H = np.array([[1.,0.]])
+
+	global kf_y
+	kf_y = KalmanFilter(dim_x=2, dim_z=1, dim_u=1)
+	kf_y.x = np.array([y_position, 0.])
+
+	kf_y.P = [[1,0],[0,1]]
+	kf_y.Q = [[0.1,0],[0,0.1]]
+	kf_y.R = [[1]]
+	kf_y.H = np.array([[1.,0.]])
+	print("Kalman Initialized")
  
-# def kalman() :
-#     kf_x = KalmanFilter(dim_x=2, dim_z=1, dim_u=1)
-# 	kf_x.x = np.array([x_position, 0.])
+def kalman(del_t1) :
+	global mouse
+	position_x = mouse_x*c_x/100
+	position_y = mouse_y*c_y/100
+	#update matrices
+	global kf_x
+	kf_x.F = np.array([[1.,del_t1],
+				[0.,1.]])
 
-# 	kf_x.P = [[1,0],[0,1]]
-# 	kf_x.Q = [[1,0],[0,1]]
-# 	kf_x.R = [[1]]
-# 	kf_x.H = np.array([[1.,0.]])
+	kf_x.B = np.array([0.5*(del_t1**2), del_t1])
 
-# 	kf_y = KalmanFilter(dim_x=2, dim_z=1, dim_u=1)
-# 	kf_y.x = np.array([y_position, 0.])
+	#predict new values
+	kf_x.predict(acc_x)
+	kf_x.update(position_x)
 
-# 	kf_y.P = [[1,0],[0,1]]
-# 	kf_y.Q = [[1,0],[0,1]]
-# 	kf_y.R = [[1]]
-# 	kf_y.H = np.array([[1.,0.]])
+	#update matrices
+	global kf_y 
+	kf_y.F = np.array([[1.,del_t1],
+				[0.,1.]])
+	kf_y.B = np.array([0.5*(del_t1**2), del_t1])
 
-# 	while True:
-		
-# 		#get data
-# 		acc_x, acc_y,del_t = get_from_udp()
-# 		position_x, position_y = get_from_camera()
-		
-# 		#update matrices
-# 		kf_x.F = np.array([[1.,del_t],
-# 					[0.,1.]])
-		
-# 		kf_x.B = np.array([0.5*(del_t**2), del_t])
-		
-# 		#predict new values
-# 		kf_x.predict(acc_x)
-# 		kf_x.update(position_x)
-		
-# 		#update matrices
-# 		kf_y.F = np.array([[1.,del_t],
-# 					[0.,1.]])
-# 		kf_y.B = np.array([0.5*(del_t**2), del_t])
-		
-# 		#predict new values
-# 		kf_y.predict(acc_y)
-# 		kf_y.update(position_y)
-		
-# 		filtered_x = kf_x.x[0]
-# 		filtered_y = kf.y.x[0]
+	#predict new values
+	kf_y.predict(acc_y)
+	kf_y.update(position_y)
+
+	filtered_x = kf_x.x[0]
+	filtered_y = kf_y.x[0]
+	mouse.position = (filtered_x*100/c_x,filtered_y*100/c_y)
+	# print("Kalman",kf_x.x,kf_y.x)
+	# print("Kalman",filtered_x*100/c_x,filtered_y*100/c_y)
+	
 
 if __name__ == "__main__":
+    global mouse
     mouse = Controller()
     # creating thread
     # t1 = threading.Thread(target=kalman, args=())
@@ -198,10 +238,11 @@ if __name__ == "__main__":
     t3 = threading.Thread(target=fun2, args=())
     # t3 = threading.Thread(target=server,args=(8081,))
     
-    
-    # t1.start()
     t2.start()
     t3.start()
+    # time.sleep(3)
+    # t1.start()
+
 
     # t1.join()
     t2.join()

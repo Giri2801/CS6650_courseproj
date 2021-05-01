@@ -125,8 +125,8 @@ while running:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:   # Change bullet from space to phone button
                 if bullet_state is "ready":
-                    bulletSound = mixer.Sound("laser.wav")
-                    bulletSound.play()
+                    # bulletSound = mixer.Sound("laser.wav")
+                    # bulletSound.play()
                     # Get the current x cordinate of the spaceship
                     bulletY = ? # Set bullet y's value based on player's position
                     bulletX = ? # Set bullet x's value based on player's position
