@@ -13,8 +13,8 @@ import socket
 import threading
 from filterpy.kalman import KalmanFilter
 import json
+import ifcfg
 import math
-
 
 mButton = pynput.mouse.Button
 
@@ -23,6 +23,9 @@ mouse_y = 0
 
 old_mouse_x = 1920 / 2
 old_mouse_y = 1080 / 2
+
+orient_posx = 0
+orient_posy = 0
 
 acc_x = 0
 acc_y = 0
@@ -36,15 +39,15 @@ fy = list()
 
 
 def updateFun(s):
-    # global mouse
-    # yaw = s['yaw'] * 180 / math.pi
-    # pitch = s['pitch'] * 180 / math.pi
-    #
-    # posx = 1920 / 2 - yaw * 32
-    # posy = 1080 / 2 - pitch * 22 + 1080 / 6
-    #
-    # mouse.position = (posx, posy)
     global acc_x, acc_y
+    global orient_posx, orient_posy
+
+    yaw = s['yaw'] * 180 / math.pi
+    pitch = s['pitch'] * 180 / math.pi
+
+    orient_posx = - yaw / 90
+    orient_posy = - pitch / 90
+
     acc_x = s['ax']
     acc_y = s['ay']
 
@@ -77,13 +80,19 @@ def pageFun(s):
         keyboard.release(pynput.keyboard.Key.page_down)
 
 
+backcount = 0
+
+
 def keyboardFun(s):
-    global keyboard
+    global keyboard, backcount
     keyboard.type(s['key'])
     if s['backspace'] == 1:
-        keyboard.press(pynput.keyboard.Key.backspace)
-        keyboard.release(pynput.keyboard.Key.backspace)
-    pass
+        if backcount == 0:
+            backcount = backcount + 1
+            keyboard.press(pynput.keyboard.Key.backspace)
+            keyboard.release(pynput.keyboard.Key.backspace)
+        else:
+            backcount = 0
 
 
 def nothingFun(s):
@@ -93,7 +102,12 @@ def nothingFun(s):
 def fun1(port_num):
     global mouse, acc_x, acc_y, del_t
 
-    localIP = socket.gethostbyname(socket.gethostname())
+    for name, interface in ifcfg.interfaces().items():
+        if name == 'Wireless LAN adapter Wi-Fi':
+            localIP = interface['inet']
+
+    # localIP = socket.gethostbyname(socket.gethostname())
+
     print("[IP ADDRESS] Set IP to: " + localIP)
     localPort = port_num
     bufferSize = 1024
@@ -106,12 +120,12 @@ def fun1(port_num):
     prev_time = -1
 
     switcher = {
-        'update':   updateFun,
-        'click':    clickFun,
-        'scroll':   scrollFun,
+        'update': updateFun,
+        'click': clickFun,
+        'scroll': scrollFun,
         'keyboard': keyboardFun,
-        'page':     pageFun,
-        'screen':   nothingFun
+        'page': pageFun,
+        'screen': nothingFun
     }
     checkVar = 0
 
@@ -222,9 +236,9 @@ def fun2():
                 y += mouse_y
                 count += 1
 
-                frac = 0.7
-                mouse_x = frac*mouse_x + (1-frac)*old_mouse_x
-                mouse_y = frac*mouse_y + (1-frac)*old_mouse_y
+                frac = 0.8
+                mouse_x = frac * mouse_x + (1 - frac) * old_mouse_x
+                mouse_y = frac * mouse_y + (1 - frac) * old_mouse_y
 
                 old_mouse_x = mouse_x
                 old_mouse_y = mouse_y
@@ -265,7 +279,7 @@ def kalman_init():
     x_position = mouse_x * c_x / 100
     y_position = mouse_y * c_y / 100
 
-    q = 0.05
+    q = 0.01
     R = 10
 
     global kf_x
@@ -301,7 +315,7 @@ def kalman(del_t1):
 
     # predict new values
     global acc_x
-    kf_x.predict(acc_x/50)
+    kf_x.predict(acc_x / 50)
     kf_x.update(position_x)
 
     # update matrices
@@ -312,7 +326,7 @@ def kalman(del_t1):
 
     # predict new values
     global acc_y
-    kf_y.predict(acc_y/50)
+    kf_y.predict(acc_y / 50)
     kf_y.update(position_y)
 
     filtered_x = kf_x.x[0] * 100 / c_x
@@ -327,7 +341,8 @@ def kalman(del_t1):
     elif filtered_y < 0:
         filtered_y = 0
 
-    mouse.position = (filtered_x, filtered_y)
+    global orient_posx, orient_posy
+    mouse.position = (filtered_x + orient_posx * 1000, filtered_y + orient_posy * 1000)
 
 
 if __name__ == "__main__":
