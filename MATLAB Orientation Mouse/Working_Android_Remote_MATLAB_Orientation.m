@@ -26,7 +26,7 @@ disp('Move the mouse!')
 posx = 1920/2;
 posy = 1080/2;
 rob.mouseMove(posx, posy);
-[msg,~] = judp('RECEIVE',port,300, 10*1000);
+[msg,~] = judp('RECEIVE',port,512, 10*1000);
 
 while true
     [msg,~] = judp('RECEIVE',port,300, 5000);
@@ -37,17 +37,22 @@ while true
     b0 = split(a{1},'"'); 
     b0 = cell2mat(b0(4));
     if strcmp(b0,'update')
-        b1 = split(a{2});
-        b11 = split(b1(1), '[');
-        orienttemp(1) = str2double(cell2mat(b11(2)));
-        orienttemp(2) = str2double(cell2mat(b1(2)));
-        orienttemp(3) = str2double(cell2mat(b1(3)));
-        b12 = split(b1(4), ']');
-        orienttemp(4) = str2double(cell2mat(b12(1)));
-        accel(1) = str2double(cell2mat(extractBetween (a{3}, length('"linAccel":"[')+1, length(a{3}))));
-        accel(2) = str2double(cell2mat(extractBetween (a{4},1, length(a{4}))));
-        az1 = str2double(split(a{5},']'));
-        accel(3) = az1(1);
+%         b1 = split(a{2});
+%         b11 = split(b1(1), '[');
+%         orienttemp(1) = str2double(cell2mat(b11(2)));
+%         orienttemp(2) = str2double(cell2mat(b1(2)));
+%         orienttemp(3) = str2double(cell2mat(b1(3)));
+%         b12 = split(b1(4), ']');
+%         orienttemp(4) = str2double(cell2mat(b12(1)));
+%         accel(1) = str2double(cell2mat(extractBetween (a{3}, length('"linAccel":"[')+1, length(a{3}))));
+%         accel(2) = str2double(cell2mat(extractBetween (a{4},1, length(a{4}))));
+%         az1 = str2double(split(a{5},']'));
+%         accel(3) = az1(1);
+%         ax(i) = accel(1);
+%         ay(i) = accel(2);
+%         az(i) = accel(3);
+        yaw = nanmean(str2double(split(a{3}, ':')));
+        pitch = nanmean(str2double(split(a{4}, ':')));
     end
     if strcmp(b0,'click')
         c1 = split(a{2}, ':');
@@ -77,25 +82,30 @@ while true
         d2 = split(d1{2}, '}');
         scroll = str2double(d2(1));
         rob.mouseWheel(floor(scroll/50));
-%         break
     end
     
+    if strcmp(b0,'keyboard')
+        break
+    end
     % With the toolbox
-    qPhone = quaternion(orienttemp);    
-    qRot = qPhone.normalize;
-    eulRot(:) = quat2eul(qRot);
+%     qPhone = quaternion(orienttemp);    
+%     qRot = qPhone.normalize;
+%     eulRot(:) = quat2eul(qRot);
     % Position based
-    posx =  1920/2 - sin(eulRot(1))*2700;
-    posy = 1080/2 - sin(eulRot(3))*2700/1.7778;
+    posx =  1920/2 - sin(yaw)*2700;
+    posy = 1080/2 - sin(pitch)*2700/1.7778;
     
-%     Without the Toolbox
+% %     Without the Toolbox
 %     q = orienttemp;
 %     eulRot(3) = atan(2*(q(1)*q(2)+q(3)*q(4)/(1-2*(q(2)^2+q(3)^2))))*180/pi;
 %     eulRot(1) = atan(2*(q(1)*q(4)+q(2)*q(3))/(1-2*(q(3)^2+q(4)^2)))*180/pi;  
-%   Position based
+% %   Position based
 %     posx =  1920/2 - eulRot(1)*32;
-%     posy = 1080/2 - eulRot(3)*18;
+%     posy = 1080/2 - eulRot(3)*22 + 1080/6;
     
+%     yaw(i) = eulRot(1);
+%     pitch(i) = eulRot(3);
+%     i = i+1;
     if posx>1920
         posx = 1920;
     end
