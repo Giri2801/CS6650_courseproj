@@ -359,15 +359,19 @@ def write_csv():
     with open('logfile.csv', 'w', newline='') as csvfile:  
         csvwriter = csv.writer(csvfile)  
         csvwriter.writerows(heading)
-        csvfile.close() 
+        csvfile.close()
+    row = [] 
     while True:
         if write_flag == 1:
-            row = [[time.time()*1000, acc_x, acc_y, orient_posx, orient_posy, mouse_x, mouse_y, filtered_x + orient_posx * 1000, filtered_y + orient_posy * 1000]]
-            with open('logfile.csv', 'a', newline='') as csvfile:  
-                csvwriter = csv.writer(csvfile)  
-                csvwriter.writerows(row)
-                csvfile.close()
-                write_flag = 0
+            row.append([time.time()*1000, acc_x, acc_y, orient_posx, orient_posy, mouse_x, mouse_y, filtered_x + orient_posx * 1000, filtered_y + orient_posy * 1000])
+            if len(row) >= 300 :
+                with open('logfile.csv', 'a', newline='') as csvfile:  
+                    csvwriter = csv.writer(csvfile)  
+                    csvwriter.writerows(row)
+                    csvfile.close()
+                row = []
+                print("Written to CSV file")
+            write_flag = 0
 
 if __name__ == "__main__":
     global mouse
