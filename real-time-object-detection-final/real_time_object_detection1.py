@@ -101,13 +101,17 @@ def nothingFun(s):
 
 def fun1(port_num):
     global mouse, acc_x, acc_y, del_t
-
+    localIP = None
     for name, interface in ifcfg.interfaces().items():
-        if name == 'Wireless LAN adapter Wi-Fi':
-            localIP = interface['inet']
+        temp = interface.get('inet','')
+        if temp==None or len(temp)<3 :
+            continue
+        if temp[0]=='1' and temp[1] == '9' and temp[2] == '2' :
+            localIP = temp
 
     # localIP = socket.gethostbyname(socket.gethostname())
-
+    if localIP == None :
+        return
     print("[IP ADDRESS] Set IP to: " + localIP)
     localPort = port_num
     bufferSize = 1024
@@ -279,8 +283,8 @@ def kalman_init():
     x_position = mouse_x * c_x / 100
     y_position = mouse_y * c_y / 100
 
-    q = 0.01
-    R = 10
+    q = 100
+    R = 400
 
     global kf_x
     kf_x = KalmanFilter(dim_x=2, dim_z=1, dim_u=1)
@@ -303,7 +307,7 @@ def kalman_init():
 
 
 def kalman(del_t1):
-    global mouse
+    global mouse,mouse_y,mouse_x
     position_x = mouse_x * c_x / 100
     position_y = mouse_y * c_y / 100
     # update matrices
@@ -343,6 +347,8 @@ def kalman(del_t1):
 
     global orient_posx, orient_posy
     mouse.position = (filtered_x + orient_posx * 1000, filtered_y + orient_posy * 1000)
+    # mouse_x = filtered_x + orient_posx * 1000
+    # mouse_y = filtered_y + orient_posy * 1000
 
 
 if __name__ == "__main__":

@@ -89,7 +89,8 @@ def nothingFun(s):
 
 def fun1(port_num):
     global s
-    localIP = socket.gethostbyname(socket.gethostname())
+    # localIP = socket.gethostbyname(socket.gethostname())
+    localIP = "192.168.1.4"
     print("[IP ADDRESS] Set IP to: " + localIP)
     localPort = port_num
     bufferSize = 1024

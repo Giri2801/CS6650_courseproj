@@ -5,7 +5,6 @@
 from imutils.video import VideoStream
 from imutils.video import FPS
 import numpy as np
-import argparse
 import imutils
 import time
 import cv2
@@ -17,9 +16,10 @@ import matplotlib.pyplot as plt
 import json
 import math
 import random
-
+import ifcfg
 import pygame
 from pygame import mixer
+from sys import exit
 
 mouse_x = 0
 mouse_y = 0
@@ -33,7 +33,17 @@ start_time=0
 init_mouse = 0
 def fun1(port_num) :
 	global mouse
-	localIP     = "192.168.1.4"
+	localIP = None
+	for name, interface in ifcfg.interfaces().items():
+		temp = interface.get('inet','')
+		if temp==None or len(temp)<3 :
+			continue
+		if temp[0]=='1' and temp[1] == '9' and temp[2] == '2' :
+			localIP = temp
+	print("Connect to : " + localIP)
+    # localIP = socket.gethostbyname(socket.gethostname())
+	if localIP == None :
+		return
 	localPort   = port_num
 	bufferSize  = 1024
     # Create a datagram socket
@@ -183,7 +193,7 @@ def kalman_init() :
 
 	kf_x.P = [[1,0],[0,1]]
 	kf_x.Q = [[0.1,0],[0,0.1]]
-	kf_x.R = [[1]]
+	kf_x.R = [[15]]
 	kf_x.H = np.array([[1.,0.]])
 
 	global kf_y
@@ -192,12 +202,14 @@ def kalman_init() :
 
 	kf_y.P = [[1,0],[0,1]]
 	kf_y.Q = [[0.1,0],[0,0.1]]
-	kf_y.R = [[10]]
+	kf_y.R = [[15]]
 	kf_y.H = np.array([[1.,0.]])
 	print("Kalman Initialized")
  
 def kalman(del_t1) :
 	global mouse
+	global acc_x,acc_y
+ 
 	position_x = mouse_x*c_x/100
 	position_y = mouse_y*c_y/100
 	#update matrices
@@ -304,17 +316,19 @@ if __name__ == "__main__":
 	testY = 10
 
     # # Game Over
-    # over_font = pygame.font.Font('freesansbold.ttf', 64)
-
+	over_font = pygame.font.Font('freesansbold.ttf', 64)
+	over_font2 = pygame.font.Font('freesansbold.ttf', 32)
 
 	def show_score(x, y):
 		score = font.render("Score : " + str(score_value), True, (0, 0, 0))
 		screen.blit(score, (x, y))
 
 
-    # def game_over_text():
-    #     over_text = over_font.render("GAME OVER", True, (255, 255, 255))
-    #     screen.blit(over_text, (200, 250))
+	def game_over_text():
+		over_text = over_font.render("You are a warrior!!", True, (255, 255, 255))
+		over_text2 = over_font2.render("You have saved the village", True, (255, 255, 255))
+		screen.blit(over_text, (150, 250))
+		screen.blit(over_text2, (200, 330))
 
 
 	def player(x, y, angle):
@@ -376,6 +390,9 @@ if __name__ == "__main__":
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT:
 				running = False
+				pygame.display.quit()
+				pygame.quit()
+				exit()
 			# if keystroke is pressed check whether its right or left
 		
   
@@ -429,6 +446,19 @@ if __name__ == "__main__":
 
 		player(playerX, playerY, theta)
 		show_score(textX, testY)
+		if score_value == 5 :
+			game_over_text()
+			pygame.display.update()
+			while 1 :
+				for event in pygame.event.get():
+					if event.type == pygame.QUIT:
+						running = False
+						pygame.display.quit()
+						pygame.quit()
+						t2.kill()
+						t3.kill()
+						exit()
+			
 		pygame.display.update()
 
 
