@@ -18,7 +18,7 @@ import math
 import csv
 
 mButton = pynput.mouse.Button
-
+write_flag = 0
 mouse_x = 0
 mouse_y = 0
 filtered_x = 0
@@ -104,7 +104,7 @@ def nothingFun(s):
 
 def fun1(port_num):
     global mouse, acc_x, acc_y, del_t
-
+    global write_flag
     for name, interface in ifcfg.interfaces().items():
         if name == 'Wireless LAN adapter Wi-Fi':
             localIP = interface['inet']
@@ -144,7 +144,7 @@ def fun1(port_num):
 
         func = switcher.get(s['purpose'], lambda: nothingFun)
         func(s)
-
+        write_flag = 1
         if checkVar == 0:
             kalman_init()
             checkVar = 1
@@ -353,18 +353,21 @@ def kalman(del_t1):
 def write_csv():
     global acc_x, acc_y, orient_posx, orient_posy
     global mouse_x, mouse_y, filtered_y, filtered_x
+    global write_flag
     time.sleep(5)
-    heading = [['ax_IMU','ay_IMU','orient_posx_IMU','orient_posy_IMU','mouse_x_camera','mouse_y_camera','kalman_x','kalman_y']]
+    heading = [['time(ms)','ax_IMU','ay_IMU','orient_posx_IMU','orient_posy_IMU','mouse_x_camera','mouse_y_camera','kalman_x','kalman_y']]
     with open('logfile.csv', 'w', newline='') as csvfile:  
         csvwriter = csv.writer(csvfile)  
         csvwriter.writerows(heading)
         csvfile.close() 
     while True:
-        row = [[acc_x, acc_y, orient_posx, orient_posy, mouse_x, mouse_y, filtered_x + orient_posx * 1000, filtered_y + orient_posy * 1000]]
-        with open('logfile.csv', 'a', newline='') as csvfile:  
-            csvwriter = csv.writer(csvfile)  
-            csvwriter.writerows(row)
-            csvfile.close()
+        if write_flag == 1:
+            row = [[time.time()*1000, acc_x, acc_y, orient_posx, orient_posy, mouse_x, mouse_y, filtered_x + orient_posx * 1000, filtered_y + orient_posy * 1000]]
+            with open('logfile.csv', 'a', newline='') as csvfile:  
+                csvwriter = csv.writer(csvfile)  
+                csvwriter.writerows(row)
+                csvfile.close()
+                write_flag = 0
 
 if __name__ == "__main__":
     global mouse
