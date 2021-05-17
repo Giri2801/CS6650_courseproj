@@ -13,7 +13,7 @@ import socket
 import threading
 from filterpy.kalman import KalmanFilter
 import json
-import ifcfg
+# import ifcfg
 import math
 
 mButton = pynput.mouse.Button
@@ -37,6 +37,7 @@ init_mouse = 0
 fx = list()
 fy = list()
 
+Rscore = 1
 
 def updateFun(s):
     global acc_x, acc_y
@@ -101,17 +102,13 @@ def nothingFun(s):
 
 def fun1(port_num):
     global mouse, acc_x, acc_y, del_t
-    localIP = None
-    for name, interface in ifcfg.interfaces().items():
-        temp = interface.get('inet','')
-        if temp==None or len(temp)<3 :
-            continue
-        if temp[0]=='1' and temp[1] == '9' and temp[2] == '2' :
-            localIP = temp
 
-    # localIP = socket.gethostbyname(socket.gethostname())
-    if localIP == None :
-        return
+    # for name, interface in ifcfg.interfaces().items():
+    #     if name == 'Wireless LAN adapter Wi-Fi':
+    #         localIP = interface['inet']
+
+    localIP = socket.gethostbyname(socket.gethostname())
+
     print("[IP ADDRESS] Set IP to: " + localIP)
     localPort = port_num
     bufferSize = 1024
@@ -174,7 +171,7 @@ def fun2():
     # initialize the video stream, allow the cammera sensor to warmup,
     # and initialize the FPS counter
 
-    global old_mouse_x, old_mouse_y
+    global old_mouse_x, old_mouse_y, Rscore
 
     print("[INFO] starting video stream...")
     vs = VideoStream(src=0).start()
@@ -204,6 +201,7 @@ def fun2():
             score = float(detection[2])
 
             if score > 0.3 and int(idx) == 77:
+                Rscore = 1 + 5*(1-score)
                 left = detection[3] * cols
                 top = detection[4] * rows
                 right = detection[5] * cols
@@ -215,18 +213,28 @@ def fun2():
                 global acc_y
                 cv2.rectangle(img, (int(left), int(top)), (int(right), int(bottom)), (23, 230, 210), thickness=2)
 
-                mouse_x = int(2500 * (left + right) * 0.5 / width)
-                mouse_y = int(1400 * (top + bottom) * 0.5 / height)
-                mouse_y = mouse_y - 300
-                mouse_x = 2050 - mouse_x
+                # mouse_x = 1920-int(1920 * (left + right) * 0.5 / width)
+                # mouse_y = int(1080 * (top + bottom) * 0.5 / height)
+                # not needed
+                # mouse_y = mouse_y - 300
+                # mouse_x = 2050 - mouse_x
 
-                # mouse_x = 1 - (((left + right) * 0.5 / width * 100 - 20)/50)
-                # mouse_y = (((top + bottom) * 0.5 / height * 100 - 20)/50)
-                #
-                # # print(mouse_x*100, mouse_y*100)
-                #
-                # mouse_x = ((mouse_x-0.5)*0.9 +0.5)*1535
-                # mouse_y = ((mouse_y-0.5)+0.5)*863
+                mouse_x = 1 - (((left + right) * 0.5 / width * 100 - 15)/70)
+                mouse_y = (((top + bottom) * 0.5 / height * 100 - 20)/50)
+
+                if mouse_x > 1:
+                    mouse_x = 1
+                elif mouse_x < 0:
+                    mouse_x = 0
+                if mouse_y > 1:
+                    mouse_y = 1
+                elif mouse_y < 0:
+                    mouse_y = 0
+
+                # print((left+right)/2*100/width, (top + bottom) * 0.5 / height * 100)
+
+                mouse_x = ((mouse_x-0.5)*0.5 + 0.5)*1535
+                mouse_y = ((mouse_y-0.5)*0.7 + 0.5)*863
 
                 if mouse_x > 1920:
                     mouse_x = 1920
@@ -240,7 +248,7 @@ def fun2():
                 y += mouse_y
                 count += 1
 
-                frac = 0.8
+                frac = 0.90
                 mouse_x = frac * mouse_x + (1 - frac) * old_mouse_x
                 mouse_y = frac * mouse_y + (1 - frac) * old_mouse_y
 
@@ -278,13 +286,17 @@ c_y = 100
 
 
 def kalman_init():
+    global mouse_x, mouse_y
     while not init_mouse:
         i = 1
     x_position = mouse_x * c_x / 100
     y_position = mouse_y * c_y / 100
 
-    q = 100
-    R = 400
+    # q = 0.05
+    # R = 5
+
+    q = 0.05
+    R = 5
 
     global kf_x
     kf_x = KalmanFilter(dim_x=2, dim_z=1, dim_u=1)
@@ -307,11 +319,17 @@ def kalman_init():
 
 
 def kalman(del_t1):
-    global mouse,mouse_y,mouse_x
+    global mouse, mouse_x, mouse_y, Rscore
+    global kf_x, kf_y
+
+    print(Rscore)
+
+    kf_y.R = Rscore
+    kf_x.R = Rscore
+
     position_x = mouse_x * c_x / 100
     position_y = mouse_y * c_y / 100
     # update matrices
-    global kf_x
     kf_x.F = np.array([[1., del_t1],
                        [0., 1.]])
 
@@ -319,18 +337,17 @@ def kalman(del_t1):
 
     # predict new values
     global acc_x
-    kf_x.predict(acc_x / 50)
+    kf_x.predict(acc_x / 1)
     kf_x.update(position_x)
 
     # update matrices
-    global kf_y
     kf_y.F = np.array([[1., del_t1],
                        [0., 1.]])
     kf_y.B = np.array([0.5 * (del_t1 ** 2), del_t1])
 
     # predict new values
     global acc_y
-    kf_y.predict(acc_y / 50)
+    kf_y.predict(acc_y / 1)
     kf_y.update(position_y)
 
     filtered_x = kf_x.x[0] * 100 / c_x
@@ -346,9 +363,7 @@ def kalman(del_t1):
         filtered_y = 0
 
     global orient_posx, orient_posy
-    mouse.position = (filtered_x + orient_posx * 1000, filtered_y + orient_posy * 1000)
-    # mouse_x = filtered_x + orient_posx * 1000
-    # mouse_y = filtered_y + orient_posy * 1000
+    mouse.position = (filtered_x + orient_posx * 1200, filtered_y + orient_posy * 1200)
 
 
 if __name__ == "__main__":
